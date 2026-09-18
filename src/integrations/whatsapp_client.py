@@ -61,11 +61,16 @@ class WhatsAppClient:
         return telefone
 
     @staticmethod
-    def extrair_mensagem_recebida(payload: dict) -> Optional[Tuple[str, str]]:
+    def extrair_mensagem_recebida(payload: dict) -> Optional[Tuple[str, str, str]]:
         """
-        Extrai (telefone_remetente, texto) de um payload de webhook da Meta.
-        Retorna None se não houver mensagem de texto de usuário (ex.: status
-        de entrega/leitura ou outro tipo de evento).
+        Extrai (telefone_remetente, texto, message_id) de um payload de
+        webhook da Meta. Retorna None se não houver mensagem de texto de
+        usuário (ex.: status de entrega/leitura ou outro tipo de evento).
+
+        O message_id é usado para deduplicação: a Meta pode reenviar a
+        mesma mensagem várias vezes se o webhook não responder rápido o
+        suficiente, e sem controle disso o mesmo texto seria processado
+        (e respondido) mais de uma vez.
         """
         try:
             entry = payload["entry"][0]
@@ -76,7 +81,7 @@ class WhatsAppClient:
             msg = mensagens[0]
             if msg.get("type") != "text":
                 return None
-            return msg["from"], msg["text"]["body"]
+            return msg["from"], msg["text"]["body"], msg["id"]
         except (KeyError, IndexError, TypeError):
             return None
 

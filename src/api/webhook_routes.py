@@ -6,10 +6,11 @@ payload, valida e delega tudo para `TriageService`. Trocar de canal (ex.:
 adicionar um chat web) significa criar um novo router aqui que também chame
 `triage_service.processar_turno`, sem duplicar lógica de negócio.
 """
-from fastapi import APIRouter, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Query, Request, Response
 
 from ..core.config import settings
 from ..integrations.whatsapp_client import whatsapp_client
+from ..repositories.mensagem_processada_repository import mensagem_processada_repository
 from ..services.triage_service import triage_service
 
 router = APIRouter()
@@ -28,23 +29,24 @@ def verificar_webhook(
 
 
 @router.post("/webhook")
-async def receber_mensagem(request: Request):
-    print("\n========== POST /WEBHOOK RECEBIDO ==========")
-
+async def receber_mensagem(request: Request, background_tasks: BackgroundTasks):
     payload = await request.json()
-    print("PAYLOAD:", payload)
-
     extraido = whatsapp_client.extrair_mensagem_recebida(payload)
-    print("EXTRAIDO:", extraido)
 
     if extraido is None:
         # Pode ser um evento de status (entregue/lido) — apenas confirma recebimento.
-        print("EVENTO IGNORADO")
         return {"status": "ignorado"}
 
-    telefone, texto_usuario = extraido
-    print(f"TELEFONE: {telefone}")
-    print(f"MENSAGEM: {texto_usuario}")
+    telefone, texto_usuario, message_id = extraido
 
-    await triage_service.processar_turno(telefone, texto_usuario)
+    if mensagem_processada_repository.ja_processada(message_id):
+        # Reenvio da Meta (a mensagem já foi processada antes) — ignora.
+        return {"status": "duplicado"}
+
+    mensagem_processada_repository.marcar_processada(message_id)
+
+    # Responde à Meta imediatamente e processa a conversa em segundo plano.
+    # Isso evita que a Meta considere o webhook "lento" e reenvie a mesma
+    # mensagem enquanto a chamada ao LLM ainda está em andamento.
+    background_tasks.add_task(triage_service.processar_turno, telefone, texto_usuario)
     return {"status": "ok"}

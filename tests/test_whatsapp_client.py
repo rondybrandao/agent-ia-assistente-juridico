@@ -9,7 +9,12 @@ def test_extrai_mensagem_de_texto_valida():
                     {
                         "value": {
                             "messages": [
-                                {"from": "5511999999999", "type": "text", "text": {"body": "Olá"}}
+                                {
+                                    "from": "5511999999999",
+                                    "type": "text",
+                                    "text": {"body": "Olá"},
+                                    "id": "wamid.ABC123",
+                                }
                             ]
                         }
                     }
@@ -17,7 +22,11 @@ def test_extrai_mensagem_de_texto_valida():
             }
         ]
     }
-    assert WhatsAppClient.extrair_mensagem_recebida(payload) == ("5511999999999", "Olá")
+    assert WhatsAppClient.extrair_mensagem_recebida(payload) == (
+        "5511999999999",
+        "Olá",
+        "wamid.ABC123",
+    )
 
 
 def test_retorna_none_para_evento_de_status():
