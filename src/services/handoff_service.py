@@ -1,28 +1,33 @@
 """
 Encaminhamento do resumo estruturado para o advogado/equipe responsável.
 
-Camada: services. Hoje envia para um webhook interno (Slack/Teams) e loga
-em arquivo; trocar por integração com um CRM jurídico é só adicionar um
-método aqui, sem tocar em domain, api ou repositories.
+Camada: services. Hoje manda uma mensagem de WhatsApp direto pro advogado,
+opcionalmente também para um webhook interno (Slack/Teams), e sempre loga em
+arquivo como trilha de auditoria. Trocar por integração com um CRM jurídico é
+só adicionar um método aqui, sem tocar em domain, api ou repositories.
 """
 import json
+import logging
 from datetime import datetime
 
 import httpx
 
 from ..core.config import settings
 from ..domain.schemas import SessaoConversa
+from ..integrations.whatsapp_client import whatsapp_client
+
+logger = logging.getLogger(__name__)
 
 
 class HandoffService:
-    def __init__(self, log_path: str = "handoffs.log.jsonl") -> None:
+    def __init__(self, log_path: str = settings.HANDOFF_LOG_PATH) -> None:
         self._log_path = log_path
 
     def _montar_texto(self, sessao: SessaoConversa) -> str:
         r = sessao.resumo_atual
         linhas = [
             f"*Novo caso para triagem* — {settings.NOME_ESCRITORIO}",
-            f"Telefone: {sessao.telefone}",
+            f"Telefone do cliente: {sessao.telefone}",
             f"Nome informado: {sessao.contato.nome or 'não informado'}",
             f"Área do direito: {r.area_direito.value}",
             f"Urgência: {r.urgencia.value.upper()}"
@@ -44,6 +49,20 @@ class HandoffService:
 
     async def encaminhar(self, sessao: SessaoConversa) -> None:
         texto = self._montar_texto(sessao)
+
+        if settings.ADVOGADO_WHATSAPP_NUMERO:
+            try:
+                await whatsapp_client.enviar_mensagem_texto(
+                    settings.ADVOGADO_WHATSAPP_NUMERO, texto
+                )
+            except Exception:
+                # Falha ao notificar o advogado não pode derrubar a triagem do
+                # cliente — o registro em log abaixo garante que o caso não
+                # se perde, mesmo que o aviso em tempo real falhe.
+                logger.exception(
+                    "Falha ao enviar handoff por WhatsApp para o advogado (telefone cliente: %s)",
+                    sessao.telefone,
+                )
 
         if settings.WEBHOOK_INTERNO_HANDOFF:
             async with httpx.AsyncClient(timeout=10) as client:
