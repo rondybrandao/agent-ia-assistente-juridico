@@ -62,6 +62,12 @@ class SessaoRepository:
             self.salvar(sessao)
         return sessao
 
+    def listar_todas(self) -> list[SessaoConversa]:
+        """Usado pelo modo advogado para listar os casos existentes."""
+        with self._conn() as conn:
+            rows = conn.execute("SELECT dados_json FROM sessoes").fetchall()
+        return [SessaoConversa.model_validate_json(row[0]) for row in rows]
+
 
 # instância padrão usada pela aplicação (injeção simples para o protótipo)
 sessao_repository = SessaoRepository()

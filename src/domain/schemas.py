@@ -22,6 +22,14 @@ class Urgencia(str, Enum):
     CRITICA = "critica"  # ex: prisão em flagrante, prazo processual iminente, risco físico
 
 
+class StatusCaso(str, Enum):
+    NOVO = "novo"  # ainda em triagem com o cliente, não encaminhado
+    ENCAMINHADO = "encaminhado"  # triagem concluída, aguardando o advogado
+    EM_ANDAMENTO = "em_andamento"  # advogado já está tratando o caso
+    RESOLVIDO = "resolvido"
+    ARQUIVADO = "arquivado"
+
+
 class AreaDireito(str, Enum):
     TRABALHISTA = "trabalhista"
     CIVEL = "civel"
@@ -48,6 +56,12 @@ class DadosContato(BaseModel):
     email: Optional[str] = None
 
 
+class Anotacao(BaseModel):
+    texto: str
+    autor: str = "advogado"
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
 class ResumoTriagem(BaseModel):
     """
     Saída estruturada da triagem — o que efetivamente vai para o advogado.
@@ -72,5 +86,7 @@ class SessaoConversa(BaseModel):
     consentimento_lgpd: bool = False
     encerrada: bool = False
     encaminhada_advogado: bool = False
+    status_caso: StatusCaso = StatusCaso.NOVO
+    anotacoes_advogado: List[Anotacao] = Field(default_factory=list)
     criada_em: datetime = Field(default_factory=datetime.utcnow)
     atualizada_em: datetime = Field(default_factory=datetime.utcnow)

@@ -26,9 +26,11 @@ class Settings:
     NOME_ESCRITORIO: str = os.getenv("NOME_ESCRITORIO", "Escritório Exemplo")
     WEBHOOK_INTERNO_HANDOFF: str = os.getenv("WEBHOOK_INTERNO_HANDOFF", "")  # ex: Slack/Teams
     EMAIL_HANDOFF: str = os.getenv("EMAIL_HANDOFF", "")
+    ADVOGADO_WHATSAPP_NUMERO: str = os.getenv("ADVOGADO_WHATSAPP_NUMERO", "")
 
     # --- Banco local (SQLite para o protótipo) ---
     DB_PATH: str = os.getenv("DB_PATH", "juridico_ia.db")
+    HANDOFF_LOG_PATH: str = os.getenv("HANDOFF_LOG_PATH", "handoffs.log.jsonl")
 
     # --- Aplicação ---
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")

@@ -8,9 +8,10 @@ recebida", independente de o canal ser WhatsApp, um chat web, etc. A camada
 import logging
 
 from ..core.config import settings
-from ..domain.schemas import Mensagem, SessaoConversa, Urgencia
+from ..domain.schemas import Mensagem, SessaoConversa, StatusCaso, Urgencia
 from ..integrations.whatsapp_client import whatsapp_client
 from ..repositories.session_repository import sessao_repository
+from .advogado_service import advogado_service
 from .handoff_service import handoff_service
 from .llm_engine import llm_engine
 
@@ -28,6 +29,10 @@ class TriageService:
     """Caso de uso principal: processar uma mensagem recebida de um usuário."""
 
     async def processar_turno(self, telefone: str, texto_usuario: str) -> None:
+        if self._eh_mensagem_do_advogado(telefone):
+            await advogado_service.processar_comando(telefone, texto_usuario)
+            return
+
         sessao = sessao_repository.obter_ou_criar(telefone)
 
         if sessao.encerrada:
@@ -55,6 +60,13 @@ class TriageService:
         if self._deve_encaminhar(sessao):
             await self._encerrar_com_handoff(sessao)
 
+    def _eh_mensagem_do_advogado(self, telefone: str) -> bool:
+        if not settings.ADVOGADO_WHATSAPP_NUMERO:
+            return False
+        return whatsapp_client.normalizar_numero_brasileiro(
+            telefone
+        ) == whatsapp_client.normalizar_numero_brasileiro(settings.ADVOGADO_WHATSAPP_NUMERO)
+
     async def _responder_e_salvar(self, sessao: SessaoConversa, texto_usuario: str) -> None:
         resposta = llm_engine.gerar_resposta_conversa(sessao.historico[:-1], texto_usuario)
         sessao.historico.append(Mensagem(remetente="assistente", texto=resposta))
@@ -74,6 +86,7 @@ class TriageService:
         await handoff_service.encaminhar(sessao)
         sessao.encaminhada_advogado = True
         sessao.encerrada = True
+        sessao.status_caso = StatusCaso.ENCAMINHADO
         sessao_repository.salvar(sessao)
         await whatsapp_client.enviar_mensagem_texto(
             sessao.telefone,
