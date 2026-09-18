@@ -29,13 +29,22 @@ def verificar_webhook(
 
 @router.post("/webhook")
 async def receber_mensagem(request: Request):
+    print("\n========== POST /WEBHOOK RECEBIDO ==========")
+
     payload = await request.json()
+    print("PAYLOAD:", payload)
+
     extraido = whatsapp_client.extrair_mensagem_recebida(payload)
+    print("EXTRAIDO:", extraido)
 
     if extraido is None:
         # Pode ser um evento de status (entregue/lido) — apenas confirma recebimento.
+        print("EVENTO IGNORADO")
         return {"status": "ignorado"}
 
     telefone, texto_usuario = extraido
+    print(f"TELEFONE: {telefone}")
+    print(f"MENSAGEM: {texto_usuario}")
+
     await triage_service.processar_turno(telefone, texto_usuario)
     return {"status": "ok"}

@@ -33,7 +33,7 @@ class TriageService:
         if sessao.encerrada:
             await whatsapp_client.enviar_mensagem_texto(
                 telefone,
-                "Seu atendimento já foi encaminhado para um de nossos advogados. "
+                "Seu atendimento já foi encaminhado. "
                 "Em breve alguém da equipe entrará em contato.",
             )
             return
@@ -77,9 +77,9 @@ class TriageService:
         sessao_repository.salvar(sessao)
         await whatsapp_client.enviar_mensagem_texto(
             sessao.telefone,
-            "Obrigada pelas informações! Já encaminhei seu caso para um de "
-            f"nossos advogados do {settings.NOME_ESCRITORIO}. Em breve alguém "
-            "da equipe entrará em contato por aqui.",
+            "Obrigada pelas informações! Já encaminhei seu caso para "
+            f"{settings.NOME_ESCRITORIO}. Em breve alguém da equipe entrará "
+            "em contato por aqui.",
         )
         logger.info("Sessão %s encaminhada ao advogado.", sessao.telefone)
 

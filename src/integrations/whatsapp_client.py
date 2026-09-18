@@ -25,6 +25,7 @@ class WhatsAppClient:
         }
 
     async def enviar_mensagem_texto(self, telefone_destino: str, texto: str) -> None:
+        telefone_destino = self._normalizar_numero_brasileiro(telefone_destino)
         payload = {
             "messaging_product": "whatsapp",
             "to": telefone_destino,
@@ -33,7 +34,31 @@ class WhatsAppClient:
         }
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.post(self._base_url, headers=self._headers, json=payload)
+            if r.status_code >= 400:
+                print("ERRO AO ENVIAR MENSAGEM:", r.status_code, r.text)
             r.raise_for_status()
+
+    @staticmethod
+    def _normalizar_numero_brasileiro(telefone: str) -> str:
+        """
+        Corrige um problema conhecido com números de celular brasileiros:
+        o campo 'from' recebido no webhook às vezes vem sem o '9' que os
+        celulares no Brasil usam (formato: 55 + DDD + 8 dígitos), enquanto
+        a API para ENVIAR mensagens espera o formato completo com o 9
+        (55 + DDD + 9 dígitos). Sem essa correção, o envio falha com
+        'Recipient phone number not in allowed list' mesmo quando o número
+        está cadastrado corretamente, só que no formato com 9.
+
+        Só adiciona o 9 quando a parte local (8 dígitos) começa com 6-9,
+        que é a faixa usada por celulares — telefones fixos (que começam
+        com 2-5) têm o mesmo tamanho mas não devem ganhar o 9.
+        """
+        if telefone.startswith("55") and len(telefone) == 12:
+            numero_local = telefone[4:]
+            if numero_local[0] in "6789":
+                ddd = telefone[2:4]
+                return f"55{ddd}9{numero_local}"
+        return telefone
 
     @staticmethod
     def extrair_mensagem_recebida(payload: dict) -> Optional[Tuple[str, str]]:
