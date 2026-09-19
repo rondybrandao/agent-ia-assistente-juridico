@@ -88,5 +88,6 @@ class SessaoConversa(BaseModel):
     encaminhada_advogado: bool = False
     status_caso: StatusCaso = StatusCaso.NOVO
     anotacoes_advogado: List[Anotacao] = Field(default_factory=list)
+    historico_pesquisa: List[Mensagem] = Field(default_factory=list)
     criada_em: datetime = Field(default_factory=datetime.utcnow)
     atualizada_em: datetime = Field(default_factory=datetime.utcnow)
