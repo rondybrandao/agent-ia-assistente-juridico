@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api.casos_routes import router as casos_router
+from .api.citacoes_routes import router as citacoes_router
 from .api.webhook_routes import router as webhook_router
 from .core.logging import configurar_logging
 
@@ -27,6 +28,7 @@ def criar_app() -> FastAPI:
 
     app.include_router(webhook_router)
     app.include_router(casos_router)
+    app.include_router(citacoes_router)
     return app
 
 

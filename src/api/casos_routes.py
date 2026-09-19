@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from ..domain.schemas import SessaoConversa
 from ..repositories.session_repository import sessao_repository
+from ..services.estrategia_service import estrategia_service
 from ..services.pesquisa_juridica_service import pesquisa_juridica_service
 
 router = APIRouter(prefix="/api/casos", tags=["casos"])
@@ -32,6 +33,11 @@ class PerguntaIn(BaseModel):
 
 class RespostaOut(BaseModel):
     resposta: str
+
+
+class EstrategiasIn(BaseModel):
+    objetivo_usuario: Optional[str] = None
+    num_estrategias: int = 3
 
 
 def _to_resumo_out(sessao: SessaoConversa) -> CasoResumoOut:
@@ -73,3 +79,20 @@ async def perguntar_pesquisa(telefone: str, corpo: PerguntaIn) -> RespostaOut:
     resposta = await pesquisa_juridica_service.perguntar(sessao, corpo.mensagem)
     sessao_repository.salvar(sessao)
     return RespostaOut(resposta=resposta)
+
+
+@router.post("/{telefone}/estrategias")
+def gerar_estrategias(telefone: str, corpo: EstrategiasIn):
+    """Gera de 2 a 4 caminhos jurídicos alternativos para o caso (não redige petição)."""
+    sessao = sessao_repository.carregar(telefone)
+    if sessao is None:
+        raise HTTPException(status_code=404, detail="Caso não encontrado")
+
+    try:
+        resultado = estrategia_service.gerar(
+            sessao, objetivo_usuario=corpo.objetivo_usuario, num_estrategias=corpo.num_estrategias
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    return resultado

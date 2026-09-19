@@ -11,6 +11,7 @@ Comandos suportados:
     ver <telefone>                 -> mostra o resumo completo de um caso
     anotar <telefone> <texto>      -> registra uma anotação no caso
     status <telefone> <status>     -> muda o status do caso
+    estrategias <telefone> [obj]   -> gera caminhos jurídicos alternativos
     ajuda                          -> mostra os comandos disponíveis
 """
 import re
@@ -19,6 +20,7 @@ from typing import Optional
 from ..domain.schemas import Anotacao, SessaoConversa, StatusCaso
 from ..integrations.whatsapp_client import whatsapp_client
 from ..repositories.session_repository import sessao_repository
+from .estrategia_service import estrategia_service
 
 _STATUS_VALIDOS = {status.value: status for status in StatusCaso}
 
@@ -29,6 +31,7 @@ _MENSAGEM_AJUDA = (
     "• anotar <telefone> <texto> — registra uma anotação no caso\n"
     "• status <telefone> <novo_status> — muda o status do caso "
     f"({', '.join(_STATUS_VALIDOS.keys())})\n"
+    "• estrategias <telefone> [objetivo] — gera caminhos jurídicos alternativos\n"
     "• ajuda — mostra esta mensagem"
 )
 
@@ -50,6 +53,9 @@ class AdvogadoService:
             return self._anotar(partes[1], partes[2])
         if comando == "status" and len(partes) >= 3:
             return self._mudar_status(partes[1], partes[2])
+        if comando == "estrategias" and len(partes) >= 2:
+            objetivo = partes[2] if len(partes) >= 3 else None
+            return self._gerar_estrategias(partes[1], objetivo)
         return _MENSAGEM_AJUDA
 
     @staticmethod
@@ -137,6 +143,57 @@ class AdvogadoService:
         sessao.status_caso = _STATUS_VALIDOS[novo_status_texto]
         sessao_repository.salvar(sessao)
         return f"Status do caso {sessao.telefone} atualizado para '{sessao.status_caso.value}'."
+
+    def _gerar_estrategias(self, fragmento_telefone: str, objetivo: Optional[str]) -> str:
+        sessao = self._encontrar_sessao(fragmento_telefone)
+        if sessao is None:
+            return f"Nenhum caso encontrado com o telefone '{fragmento_telefone}'."
+
+        try:
+            resultado = estrategia_service.gerar(sessao, objetivo_usuario=objetivo)
+        except ValueError:
+            return (
+                "Não consegui gerar as estratégias agora (a IA não retornou um "
+                "formato válido). Tente novamente em instantes."
+            )
+
+        return self._formatar_estrategias(resultado)
+
+    @staticmethod
+    def _formatar_estrategias(resultado) -> str:
+        linhas = []
+
+        if resultado.alertas_criticos:
+            linhas.append("⚠️ *ALERTAS CRÍTICOS*")
+            for a in resultado.alertas_criticos:
+                linhas.append(f"[{a.tipo}] {a.descricao} — {a.acao_recomendada}")
+            linhas.append("")
+
+        if resultado.lacunas:
+            linhas.append("*Dados faltantes:*")
+            for l in resultado.lacunas:
+                linhas.append(f"- {l.dado_faltante}: {l.impacto}")
+            linhas.append("")
+
+        linhas.append("*Estratégias:*")
+        for e in resultado.estrategias:
+            linhas.append(
+                f"\n*[{e.id}] {e.nome}*\n"
+                f"Via: {e.via} | Rito: {e.rito} | Probabilidade: {e.probabilidade_qualitativa.value}\n"
+                f"{e.resumo}\n"
+                f"Pontos fortes: {', '.join(e.pontos_fortes) or '-'}\n"
+                f"Riscos: {', '.join(e.riscos) or '-'}\n"
+                f"Quando escolher: {e.quando_escolher}"
+            )
+
+        if resultado.recomendacao:
+            linhas.append(
+                f"\n*Recomendação:* estratégia {resultado.recomendacao.estrategia_id} — "
+                f"{resultado.recomendacao.motivo}"
+            )
+
+        linhas.append(f"\n_{resultado.aviso}_")
+        return "\n".join(linhas)
 
 
 # instância padrão usada pela aplicação
