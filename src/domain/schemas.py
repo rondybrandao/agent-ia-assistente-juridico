@@ -14,6 +14,10 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from .estrategia_schemas import Estrategia
+from .estrategia_schemas import Estrategia, RespostaEstrategias
+from .fatos_schemas import RespostaExtracaoFatos
+
 
 class Urgencia(str, Enum):
     BAIXA = "baixa"
@@ -62,6 +66,59 @@ class Anotacao(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
+class DadosPessoaisAutor(BaseModel):
+    """
+    Qualificação civil completa do autor — os mesmos campos exigidos pelos
+    templates de petição (bloco qualificacao_pf). A triagem não deve se
+    considerar concluída enquanto algum destes faltar (ver
+    TriageService._deve_encaminhar).
+    """
+    nome: Optional[str] = None
+    nacionalidade: Optional[str] = None
+    estado_civil: Optional[str] = None
+    profissao: Optional[str] = None
+    cpf: Optional[str] = None
+    rg: Optional[str] = None
+    endereco_completo: Optional[str] = None
+    cep: Optional[str] = None
+    cidade: Optional[str] = None
+    data_nascimento: Optional[str] = None
+
+    def esta_completo(self) -> bool:
+        campos = [
+            self.nome,
+            self.nacionalidade,
+            self.estado_civil,
+            self.profissao,
+            self.cpf,
+            self.rg,
+            self.endereco_completo,
+            self.cep,
+            self.cidade,
+            self.data_nascimento,
+        ]
+        return all(bool(c and c.strip()) for c in campos)
+
+    def campos_faltando(self) -> List[str]:
+        nomes_amigaveis = {
+            "nome": "nome completo",
+            "nacionalidade": "nacionalidade",
+            "estado_civil": "estado civil",
+            "profissao": "profissão",
+            "cpf": "CPF",
+            "rg": "RG",
+            "endereco_completo": "endereço completo",
+            "cep": "CEP",
+            "cidade": "cidade",
+            "data_nascimento": "data de nascimento",
+        }
+        return [
+            amigavel
+            for campo, amigavel in nomes_amigaveis.items()
+            if not (getattr(self, campo) and getattr(self, campo).strip())
+        ]
+
+
 class ResumoTriagem(BaseModel):
     """
     Saída estruturada da triagem — o que efetivamente vai para o advogado.
@@ -75,6 +132,7 @@ class ResumoTriagem(BaseModel):
     fatos_relevantes: List[str] = Field(default_factory=list)
     documentos_mencionados: List[str] = Field(default_factory=list)
     perguntas_em_aberto: List[str] = Field(default_factory=list)
+    dados_pessoais_autor: DadosPessoaisAutor = Field(default_factory=DadosPessoaisAutor)
     pronto_para_advogado: bool = False
 
 
@@ -89,5 +147,9 @@ class SessaoConversa(BaseModel):
     status_caso: StatusCaso = StatusCaso.NOVO
     anotacoes_advogado: List[Anotacao] = Field(default_factory=list)
     historico_pesquisa: List[Mensagem] = Field(default_factory=list)
+    fatos_estruturados: Optional[RespostaExtracaoFatos] = None
+    ultimas_estrategias: Optional[RespostaEstrategias] = None
+    estrategia_escolhida: Optional[Estrategia] = None
+    estrategia_escolhida: Optional[Estrategia] = None
     criada_em: datetime = Field(default_factory=datetime.utcnow)
     atualizada_em: datetime = Field(default_factory=datetime.utcnow)

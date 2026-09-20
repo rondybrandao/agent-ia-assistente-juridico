@@ -26,6 +26,11 @@ SEU PAPEL:
   se existem documentos, e o que a pessoa espera como resultado.
 - Identificar a área do direito envolvida (trabalhista, cível, família, penal,
   consumidor, tributário, previdenciário, empresarial, imobiliário ou outro).
+- Coletar a QUALIFICAÇÃO COMPLETA da pessoa (necessária para qualquer petição):
+  nome completo, nacionalidade, estado civil, profissão, CPF, RG, endereço
+  completo, CEP, cidade e data de nascimento. Peça isso aos poucos, 1-2 dados
+  por vez, misturado naturalmente com as perguntas sobre o caso — não despeje
+  a lista inteira de uma vez, e não deixe de perguntar o que ainda falta.
 
 REGRAS QUE VOCÊ NUNCA QUEBRA:
 1. Você NUNCA dá conselho jurídico, opinião sobre chance de êxito, valor de causa,
@@ -38,6 +43,7 @@ REGRAS QUE VOCÊ NUNCA QUEBRA:
    prazo processual nas próximas 24-48h, risco de violência doméstica ou à
    integridade física, medida protetiva), sinalize isso claramente na resposta
    e oriente a pessoa a também buscar ajuda imediata (192/190/Disque 100 conforme o caso).
+   Nesse caso, o encaminhamento urgente NÃO espera a qualificação completa.
 5. Seja objetiva: no máximo 2-3 perguntas por mensagem, linguagem simples, sem juridiquês.
 6. Na primeira mensagem, explique em 1-2 frases que você é uma assistente de
    triagem (não advogada), que a conversa poderá ser usada para direcionar o
@@ -46,6 +52,9 @@ REGRAS QUE VOCÊ NUNCA QUEBRA:
 7. NUNCA invente nomes de pessoas, advogados, cargos ou informações que não
    estejam explicitamente fornecidas a você. Use somente "{settings.NOME_ESCRITORIO}"
    para se referir a quem vai avaliar o caso — nunca crie um nome diferente.
+8. NÃO considere a triagem concluída (não diga que vai encaminhar, não pare de
+   perguntar) enquanto qualquer um dos 10 dados de qualificação do item acima
+   ainda não tiver sido informado — exceto em caso de urgência crítica (regra 4).
 
 Responda sempre em português do Brasil, tom profissional e acolhedor.
 """
@@ -55,6 +64,18 @@ Você é um extrator de dados. Leia a conversa entre a assistente de triagem e o
 usuário e preencha o JSON estruturado com o que foi dito ATÉ AGORA.
 Não invente informação que não foi mencionada. Não dê opinião jurídica.
 Se algo não foi informado, deixe o campo vazio/ausente.
+
+"pronto_para_advogado" só pode ser true se:
+(a) os fatos do caso já dão pra entender o que aconteceu, E
+(b) TODOS os 10 campos de "dados_pessoais_autor" estão preenchidos
+    (nome, nacionalidade, estado_civil, profissao, cpf, rg,
+    endereco_completo, cep, cidade, data_nascimento),
+EXCETO quando "urgencia" for "critica" — nesse caso, marque
+pronto_para_advogado true mesmo com qualificação incompleta, e liste os
+dados pessoais que faltam em "perguntas_em_aberto".
+Se pronto_para_advogado for false por falta de dado pessoal, liste
+explicitamente cada campo faltante em "perguntas_em_aberto" (ex.: "CPF do
+autor", "endereço completo do autor").
 """
 
 _EXTRACAO_SCHEMA = {
@@ -80,11 +101,27 @@ _EXTRACAO_SCHEMA = {
             "perguntas_em_aberto": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "O que ainda falta perguntar antes de encaminhar ao advogado.",
+                "description": "O que ainda falta perguntar antes de encaminhar ao advogado, incluindo dados pessoais faltantes.",
+            },
+            "dados_pessoais_autor": {
+                "type": "object",
+                "description": "Qualificação civil do autor. Deixe um campo ausente/null se não foi informado — nunca invente.",
+                "properties": {
+                    "nome": {"type": "string"},
+                    "nacionalidade": {"type": "string"},
+                    "estado_civil": {"type": "string"},
+                    "profissao": {"type": "string"},
+                    "cpf": {"type": "string"},
+                    "rg": {"type": "string"},
+                    "endereco_completo": {"type": "string"},
+                    "cep": {"type": "string"},
+                    "cidade": {"type": "string"},
+                    "data_nascimento": {"type": "string"},
+                },
             },
             "pronto_para_advogado": {
                 "type": "boolean",
-                "description": "true se já há informação suficiente para um advogado avaliar o caso.",
+                "description": "true somente se os fatos E toda a qualificação pessoal foram coletados (ou a urgência é crítica).",
             },
         },
         "required": ["area_direito", "urgencia", "pronto_para_advogado"],

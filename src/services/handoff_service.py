@@ -25,17 +25,32 @@ class HandoffService:
 
     def _montar_texto(self, sessao: SessaoConversa) -> str:
         r = sessao.resumo_atual
+        dp = r.dados_pessoais_autor
         linhas = [
             f"*Novo caso para triagem* — {settings.NOME_ESCRITORIO}",
             f"Telefone do cliente: {sessao.telefone}",
-            f"Nome informado: {sessao.contato.nome or 'não informado'}",
             f"Área do direito: {r.area_direito.value}",
             f"Urgência: {r.urgencia.value.upper()}"
             + (f" — {r.motivo_urgencia}" if r.motivo_urgencia else ""),
             "",
+            "*Qualificação do autor:*",
+            f"Nome: {dp.nome or '(não informado)'}",
+            f"Nacionalidade: {dp.nacionalidade or '(não informado)'} | "
+            f"Estado civil: {dp.estado_civil or '(não informado)'} | "
+            f"Profissão: {dp.profissao or '(não informado)'}",
+            f"CPF: {dp.cpf or '(não informado)'} | RG: {dp.rg or '(não informado)'}",
+            f"Endereço: {dp.endereco_completo or '(não informado)'}, "
+            f"CEP {dp.cep or '(não informado)'}, {dp.cidade or '(não informado)'}",
+            f"Data de nascimento: {dp.data_nascimento or '(não informado)'}",
+            "",
             "Resumo do caso:",
             r.resumo_caso or "(sem resumo ainda)",
         ]
+        if not dp.esta_completo():
+            linhas.insert(
+                6,
+                f"⚠️ Qualificação incompleta — faltam: {', '.join(dp.campos_faltando())}",
+            )
         if r.fatos_relevantes:
             linhas.append("\nFatos relevantes:")
             linhas += [f"- {f}" for f in r.fatos_relevantes]

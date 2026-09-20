@@ -10,8 +10,8 @@ from src.integrations.whatsapp_client import WhatsAppClient
     ("551140028922", "551140028922"),    # telefone fixo BR (10 dígitos locais) -> não mexe*
     ("55923584859", "55923584859"),
     ("55993584859", "55993584859"),
-    ("559293584859", "559293584859"),
+    ("559293584859", "5592993584859"),
     ("5592993584859", "5592993584859")
 ])
 def test_normalizar_numero_brasileiro(entrada, esperado):
-    assert WhatsAppClient._normalizar_numero_brasileiro(entrada) == esperado
+    assert WhatsAppClient.normalizar_numero_brasileiro(entrada) == esperado

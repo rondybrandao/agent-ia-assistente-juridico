@@ -21,6 +21,7 @@ from ..domain.schemas import Anotacao, SessaoConversa, StatusCaso
 from ..integrations.whatsapp_client import whatsapp_client
 from ..repositories.session_repository import sessao_repository
 from .estrategia_service import estrategia_service
+from .extracao_fatos_service import extracao_fatos_service
 
 _STATUS_VALIDOS = {status.value: status for status in StatusCaso}
 
@@ -32,16 +33,17 @@ _MENSAGEM_AJUDA = (
     "• status <telefone> <novo_status> — muda o status do caso "
     f"({', '.join(_STATUS_VALIDOS.keys())})\n"
     "• estrategias <telefone> [objetivo] — gera caminhos jurídicos alternativos\n"
+    "• fatos <telefone> — extrai linha do tempo, partes e valores da conversa\n"
     "• ajuda — mostra esta mensagem"
 )
 
 
 class AdvogadoService:
     async def processar_comando(self, telefone_advogado: str, texto: str) -> None:
-        resposta = self._interpretar(texto)
+        resposta = await self._interpretar(texto)
         await whatsapp_client.enviar_mensagem_texto(telefone_advogado, resposta)
 
-    def _interpretar(self, texto: str) -> str:
+    async def _interpretar(self, texto: str) -> str:
         partes = texto.strip().split(maxsplit=2)
         comando = partes[0].lower() if partes else ""
 
@@ -55,7 +57,9 @@ class AdvogadoService:
             return self._mudar_status(partes[1], partes[2])
         if comando == "estrategias" and len(partes) >= 2:
             objetivo = partes[2] if len(partes) >= 3 else None
-            return self._gerar_estrategias(partes[1], objetivo)
+            return await self._gerar_estrategias(partes[1], objetivo)
+        if comando == "fatos" and len(partes) >= 2:
+            return self._extrair_fatos(partes[1])
         return _MENSAGEM_AJUDA
 
     @staticmethod
@@ -144,13 +148,65 @@ class AdvogadoService:
         sessao_repository.salvar(sessao)
         return f"Status do caso {sessao.telefone} atualizado para '{sessao.status_caso.value}'."
 
-    def _gerar_estrategias(self, fragmento_telefone: str, objetivo: Optional[str]) -> str:
+    def _extrair_fatos(self, fragmento_telefone: str) -> str:
         sessao = self._encontrar_sessao(fragmento_telefone)
         if sessao is None:
             return f"Nenhum caso encontrado com o telefone '{fragmento_telefone}'."
 
         try:
-            resultado = estrategia_service.gerar(sessao, objetivo_usuario=objetivo)
+            resultado = extracao_fatos_service.extrair_e_persistir(sessao)
+        except ValueError:
+            return (
+                "Não consegui extrair os fatos agora (a IA não retornou um "
+                "formato válido). Tente novamente em instantes."
+            )
+
+        return self._formatar_fatos(resultado)
+
+    @staticmethod
+    def _formatar_fatos(resultado) -> str:
+        linhas = [f"*Fatos extraídos*\n{resultado.resumo_narrativo}"]
+
+        if resultado.linha_do_tempo:
+            linhas.append("\n*Linha do tempo:*")
+            for evento in resultado.linha_do_tempo:
+                data = evento.data or evento.data_aproximada_texto or "(sem data)"
+                linhas.append(f"- [{data}] {evento.descricao}")
+
+        if resultado.partes:
+            linhas.append("\n*Partes:*")
+            for parte in resultado.partes:
+                linhas.append(f"- {parte.papel}: {parte.nome or '(não identificado)'}")
+
+        if resultado.valores_mencionados:
+            linhas.append("\n*Valores mencionados:*")
+            for valor in resultado.valores_mencionados:
+                valor_texto = f"R$ {valor.valor}" if valor.valor is not None else "(sem valor)"
+                linhas.append(f"- {valor.descricao}: {valor_texto}")
+
+        if resultado.pontos_controvertidos:
+            linhas.append("\n*Pontos controvertidos:*")
+            for ponto in resultado.pontos_controvertidos:
+                linhas.append(f"- {ponto.descricao} ({ponto.motivo})")
+
+        if resultado.lacunas:
+            linhas.append("\n*Lacunas:*")
+            for lacuna in resultado.lacunas:
+                linhas.append(f"- {lacuna.dado_faltante}: {lacuna.impacto}")
+
+        linhas.append(f"\n_{resultado.aviso}_")
+        linhas.append(
+            "\nEsses fatos já foram salvos e passam a alimentar 'estrategias' e a checagem de pressupostos deste caso."
+        )
+        return "\n".join(linhas)
+
+    async def _gerar_estrategias(self, fragmento_telefone: str, objetivo: Optional[str]) -> str:
+        sessao = self._encontrar_sessao(fragmento_telefone)
+        if sessao is None:
+            return f"Nenhum caso encontrado com o telefone '{fragmento_telefone}'."
+
+        try:
+            resultado = await estrategia_service.gerar(sessao, objetivo_usuario=objetivo)
         except ValueError:
             return (
                 "Não consegui gerar as estratégias agora (a IA não retornou um "

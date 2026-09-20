@@ -22,6 +22,19 @@ class Settings:
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
     LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
 
+    # --- Busca na web (pesquisa jurídica do advogado) ---
+    TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
+
+    # --- Valores legais que mudam periodicamente (definir_competencia) ---
+    # R$ 1.621,00 (Decreto 12.797/2025, vigente desde 01/01/2026). Revisar
+    # todo ano — pode ser sobrescrito por requisição também.
+    SALARIO_MINIMO_VIGENTE: float = float(os.getenv("SALARIO_MINIMO_VIGENTE", "1621.00"))
+
+    # --- Valores legais que mudam periodicamente (calcular_custas) ---
+    # R$ 8.475,55 (Portaria Interministerial MPS/MF nº 13/2026), usado no
+    # teto das custas trabalhistas (4x o teto do RGPS, CLT art. 789).
+    TETO_RGPS_VIGENTE: float = float(os.getenv("TETO_RGPS_VIGENTE", "8475.55"))
+
     # --- Escritório / handoff ---
     NOME_ESCRITORIO: str = os.getenv("NOME_ESCRITORIO", "Escritório Exemplo")
     WEBHOOK_INTERNO_HANDOFF: str = os.getenv("WEBHOOK_INTERNO_HANDOFF", "")  # ex: Slack/Teams
@@ -34,9 +47,6 @@ class Settings:
 
     # --- Aplicação ---
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
-
-     # --- Busca na web (pesquisa jurídica do advogado) ---
-    TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
 
 
 settings = Settings()

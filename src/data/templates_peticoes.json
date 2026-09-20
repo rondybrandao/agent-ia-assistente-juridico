@@ -1,0 +1,240 @@
+{
+  "_meta": {
+    "versao": "1.0",
+    "convencoes": {
+      "placeholders": "{{campo}} é obrigatório; {{?campo}} é opcional; [PENDENTE: descrição] é inserido pelo agente quando o dado não foi fornecido.",
+      "regra_de_ouro": "O agente NUNCA preenche fato, valor, data ou citação sem fonte. Citações só entram se estiverem em citacoes_verificadas.",
+      "revisao": "Toda peça exige revisão e assinatura de advogado, salvo jus postulandi (Juizados Estaduais até 20 SM; Justiça do Trabalho)."
+    },
+    "estrutura_comum_cpc_319": [
+      "enderecamento", "qualificacao_partes", "dos_fatos", "do_direito",
+      "da_tutela_provisoria", "dos_pedidos", "das_provas", "opcao_audiencia_conciliacao",
+      "valor_da_causa", "fecho"
+    ]
+  },
+
+  "blocos_reutilizaveis": {
+    "enderecamento_estadual": "EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DA {{vara}} DA COMARCA DE {{comarca}}/AM",
+    "enderecamento_juizado": "EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO {{juizado}} DA COMARCA DE {{comarca}}/AM",
+    "enderecamento_federal": "EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) FEDERAL DA {{vara}} DA SEÇÃO JUDICIÁRIA DO AMAZONAS",
+    "enderecamento_trabalho": "EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA {{vara}} DO TRABALHO DE {{municipio}}/AM",
+    "qualificacao_pf": "{{nome}}, {{nacionalidade}}, {{estado_civil}}, {{profissao}}, inscrito(a) no CPF sob o nº {{cpf}}, portador(a) do RG nº {{rg}}, residente e domiciliado(a) na {{endereco_completo}}, CEP {{cep}}, e-mail {{?email}}, telefone {{?telefone}}",
+    "qualificacao_pj": "{{razao_social}}, pessoa jurídica de direito {{privado_ou_publico}}, inscrita no CNPJ sob o nº {{cnpj}}, com sede na {{endereco_completo}}, CEP {{cep}}, representada por {{?representante}}",
+    "declaracao_opcao_conciliacao": "Nos termos do art. 319, VII, do CPC, o(a) Autor(a) {{opta_ou_nao}} pela realização de audiência de conciliação ou de mediação.",
+    "gratuidade": "O(A) Autor(a) requer os benefícios da gratuidade da justiça, nos termos do art. 98 e seguintes do CPC, por declaração de hipossuficiência anexa, não dispondo de meios para arcar com custas e despesas sem prejuízo do próprio sustento.",
+    "fecho": "Nestes termos,\nPede deferimento.\n{{cidade}}/AM, {{data}}.\n\n{{nome_advogado}}\nOAB/{{uf_oab}} nº {{numero_oab}}",
+    "fecho_sem_advogado": "Nestes termos,\nPede deferimento.\n{{cidade}}/AM, {{data}}.\n\n{{nome_autor}}\nCPF {{cpf}}"
+  },
+
+  "templates": [
+    {
+      "template_id": "consumo_indenizatoria_jec",
+      "titulo": "Ação de repetição de indébito e/ou indenização por danos (relação de consumo) – Juizado Especial Cível",
+      "area": "consumidor",
+      "ramo": "estadual",
+      "rito": "juizado_especial",
+      "base_legal_tipica": ["CDC arts. 6º, 14, 18, 20, 42 par. único", "CC arts. 186, 927", "Lei 9.099/1995"],
+      "competencia": "Foro do domicílio do autor ou do réu (CDC art. 101, I; Lei 9.099 art. 4º). Teto: 40 SM. Sem advogado até 20 SM.",
+      "campos_obrigatorios": ["autor", "reu", "fatos_cronologicos", "valor_causa", "pedidos", "documentos"],
+      "documentos_tipicos": ["documento pessoal", "comprovante de residência", "contrato/fatura/nota fiscal", "prints e protocolos de atendimento", "comprovantes de pagamento", "extrato de negativação (se houver)"],
+      "secoes": [
+        { "id": "enderecamento", "texto": "{{bloco:enderecamento_juizado}}" },
+        { "id": "partes", "texto": "{{nome_autor}}, qualificação: {{bloco:qualificacao_pf}}, vem, respeitosamente, propor a presente\n\nAÇÃO DE {{tipo_acao}} C/C {{?danos_morais}}\n\nem face de {{bloco:qualificacao_pj}}, pelos fatos e fundamentos a seguir." },
+        { "id": "dos_fatos", "texto": "I – DOS FATOS\n{{fatos_em_ordem_cronologica}}\nOs fatos estão comprovados pelos documentos anexos ({{lista_documentos}})." },
+        { "id": "do_direito", "texto": "II – DO DIREITO\n1. Da relação de consumo: {{fundamentacao_relacao_consumo}}\n2. Da responsabilidade do fornecedor: {{fundamentacao_responsabilidade}}\n3. Da inversão do ônus da prova (CDC art. 6º, VIII): {{?fundamentacao_inversao}}\n4. Da repetição do indébito em dobro (CDC art. 42, par. único): {{?fundamentacao_dobro}}\n5. Dos danos morais: {{?fundamentacao_dano_moral}}" },
+        { "id": "tutela", "texto": "III – DA TUTELA DE URGÊNCIA\n{{?pedido_tutela_ou_texto: 'Não há pedido de tutela de urgência.'}}" },
+        { "id": "pedidos", "texto": "IV – DOS PEDIDOS\nDiante do exposto, requer:\na) a citação do réu para comparecer à audiência e apresentar defesa, sob pena de revelia;\nb) {{pedido_principal}};\nc) {{?pedido_repeticao_indebito}};\nd) {{?pedido_danos_morais}};\ne) a inversão do ônus da prova, nos termos do art. 6º, VIII, do CDC;\nf) {{bloco:gratuidade_se_aplicavel}}." },
+        { "id": "provas", "texto": "V – DAS PROVAS\nProtesta provar o alegado por todos os meios em direito admitidos, em especial documental e depoimento pessoal do réu." },
+        { "id": "valor_causa", "texto": "Dá-se à causa o valor de R$ {{valor_causa}} ({{valor_por_extenso}})." },
+        { "id": "fecho", "texto": "{{bloco:fecho_ou_fecho_sem_advogado}}" }
+      ],
+      "checagens_especificas": [
+        "Valor da causa (incluindo danos morais) não ultrapassa 40 SM; se ultrapassar, incluir renúncia expressa ao excedente ou migrar para vara comum.",
+        "Sem advogado só até 20 SM; acima disso, advogado obrigatório.",
+        "Réu com endereço completo para citação.",
+        "Não pedir perícia complexa (afasta o Juizado)."
+      ],
+      "estrategias_alternativas_sugeridas": ["A: JEC enxuto", "B: vara comum + tutela + danos morais", "C: notificação + Procon-AM/consumidor.gov.br + CEJUSC"]
+    },
+
+    {
+      "template_id": "civel_cobranca_comum",
+      "titulo": "Ação de cobrança / obrigação de pagar – procedimento comum",
+      "area": "civel_contratos",
+      "ramo": "estadual",
+      "rito": "comum",
+      "base_legal_tipica": ["CC arts. 389, 395, 397, 406, 475", "CPC arts. 319, 320, 292"],
+      "competencia": "Foro do domicílio do réu (CPC art. 46) ou foro de eleição válido (art. 63).",
+      "campos_obrigatorios": ["credor", "devedor", "titulo_ou_contrato", "vencimento", "valor_principal", "memoria_calculo"],
+      "documentos_tipicos": ["contrato", "notas fiscais/duplicatas", "notificação de cobrança", "comprovante de entrega do serviço/produto", "planilha de cálculo atualizada"],
+      "secoes": [
+        { "id": "enderecamento", "texto": "{{bloco:enderecamento_estadual}}" },
+        { "id": "partes", "texto": "{{bloco:qualificacao_pf_ou_pj_autor}}, por seu advogado ({{procuracao_anexa}}), vem propor\n\nAÇÃO DE COBRANÇA\n\nem face de {{qualificacao_reu}}, pelas razões de fato e de direito seguintes." },
+        { "id": "dos_fatos", "texto": "I – DOS FATOS\n{{fatos}}\nO débito, vencido em {{data_vencimento}}, monta a R$ {{valor_principal}}, conforme memória de cálculo anexa (Doc. {{doc_calculo}})." },
+        { "id": "do_direito", "texto": "II – DO DIREITO\n{{fundamentacao_inadimplemento}}\nJuros de mora: {{fundamentacao_juros}}. Correção monetária: {{fundamentacao_correcao}}. Multa contratual: {{?fundamentacao_multa}}." },
+        { "id": "tutela", "texto": "III – DA TUTELA PROVISÓRIA\n{{?tutela_evidencia_ou_urgencia}}" },
+        { "id": "pedidos", "texto": "IV – DOS PEDIDOS\na) a citação do réu para responder à presente ação, no prazo legal;\nb) a condenação ao pagamento de R$ {{valor_principal}}, acrescido de correção monetária desde {{data_base_correcao}} e juros de mora de {{juros}} desde {{termo_inicial_juros}};\nc) {{?multa_contratual}};\nd) a condenação em custas e honorários advocatícios (CPC art. 85);\ne) {{?gratuidade}}." },
+        { "id": "audiencia", "texto": "{{bloco:declaracao_opcao_conciliacao}}" },
+        { "id": "provas", "texto": "V – DAS PROVAS\nProtesta pela produção de todas as provas admitidas, em especial documental, testemunhal e pericial, se necessário." },
+        { "id": "valor_causa", "texto": "Dá-se à causa o valor de R$ {{valor_causa}} (CPC art. 292, I)." },
+        { "id": "fecho", "texto": "{{bloco:fecho}}" }
+      ],
+      "checagens_especificas": [
+        "Prescrição: pretensão de cobrança de dívida líquida em instrumento é de 5 anos (CC art. 206, §5º, I); confirmar prazo aplicável ao caso.",
+        "Valor da causa condiz com a memória de cálculo.",
+        "Se valor ≤ 40 SM e sem complexidade, avaliar JEC como estratégia alternativa.",
+        "Se há título executivo extrajudicial, avaliar ação de execução em vez de cobrança."
+      ],
+      "estrategias_alternativas_sugeridas": ["A: notificação extrajudicial + acordo", "B: JEC (se ≤ 40 SM)", "C: vara comum com tutela de evidência", "D: execução de título extrajudicial (se cabível)"]
+    },
+
+    {
+      "template_id": "civel_indenizatoria_erro_medico",
+      "titulo": "Ação de indenização por danos materiais e morais decorrentes de erro médico / negligência no atendimento de saúde – procedimento comum",
+      "area": "civel_saude",
+      "ramo": "estadual",
+      "rito": "comum",
+      "base_legal_tipica": ["CC arts. 186, 927, 951", "CDC art. 14 (caput e §4º)", "CPC arts. 319, 320", "Código de Ética Médica (Res. CFM)"],
+      "competencia": "Se enquadrado como relação de consumo (paciente x hospital/plano/clínica): foro do domicílio do autor (CDC art. 101, I). Caso contrário: foro do domicílio do réu (CPC art. 46). Rito comum — a perícia médica quase sempre exigida afasta o Juizado Especial.",
+      "campos_obrigatorios": ["autor_paciente_ou_representante", "reu_medico_e_ou_hospital", "fatos_cronologicos_do_atendimento", "procedimento_realizado", "complicacao_ou_dano_sofrido", "nexo_causal_alegado", "valor_causa", "pedidos"],
+      "documentos_tipicos": ["prontuário médico completo", "laudos e exames (antes e depois)", "atestados e receituários", "comprovantes de internação", "recibos de despesas médicas e de tratamento", "fotos da lesão/sequela (se houver)", "boletim de ocorrência (se houver)", "parecer técnico ou pericial prévio (se já obtido)"],
+      "secoes": [
+        { "id": "enderecamento", "texto": "{{bloco:enderecamento_estadual}}" },
+        { "id": "partes", "texto": "{{bloco:qualificacao_pf_ou_pj_autor}}, vem propor\n\nAÇÃO DE INDENIZAÇÃO POR DANOS MATERIAIS E MORAIS\n\nem face de {{qualificacao_reu_medico}} {{?e_de_qualificacao_reu_hospital}}, pelos fatos e fundamentos a seguir." },
+        { "id": "dos_fatos", "texto": "I – DOS FATOS\n{{fatos_em_ordem_cronologica_do_atendimento}}\nO procedimento realizado foi {{procedimento_realizado}}, do qual resultou {{complicacao_ou_dano_sofrido}}, exigindo {{consequencia_ex_internacao_nova_cirurgia_sequela}}, conforme documentos anexos ({{lista_documentos}})." },
+        { "id": "do_direito", "texto": "II – DO DIREITO\n1. Da responsabilidade civil do profissional médico (subjetiva, mediante verificação de culpa – CDC art. 14, §4º; CC arts. 186 e 951): {{fundamentacao_culpa_medica}}\n2. Da responsabilidade do hospital/clínica pela falha nos serviços prestados (objetiva quanto à sua própria atividade – CDC art. 14, caput): {{?fundamentacao_responsabilidade_hospital}}\n3. Do nexo de causalidade entre a conduta e o dano: {{fundamentacao_nexo_causal}}\n4. Dos danos materiais (despesas já realizadas e tratamento futuro): {{?fundamentacao_dano_material}}\n5. Dos danos morais: {{?fundamentacao_dano_moral}}" },
+        { "id": "tutela", "texto": "III – DA TUTELA DE URGÊNCIA\n{{?pedido_tutela_ou_texto: 'Não há pedido de tutela de urgência.'}}" },
+        { "id": "pedidos", "texto": "IV – DOS PEDIDOS\nDiante do exposto, requer:\na) a citação do(s) réu(s) para, querendo, contestar a presente ação;\nb) a produção de prova pericial médica, com quesitos oportunamente apresentados;\nc) {{?pedido_danos_materiais}};\nd) {{?pedido_danos_morais}};\ne) a inversão do ônus da prova, nos termos do art. 6º, VIII, do CDC, quando aplicável;\nf) {{bloco:gratuidade_se_aplicavel}}." },
+        { "id": "provas", "texto": "V – DAS PROVAS\nProtesta provar o alegado por todos os meios em direito admitidos, especialmente prova pericial médica, documental (inclusive requisição do prontuário completo, se não anexado integralmente) e testemunhal." },
+        { "id": "valor_causa", "texto": "Dá-se à causa o valor de R$ {{valor_causa}} ({{valor_por_extenso}})." },
+        { "id": "fecho", "texto": "{{bloco:fecho}}" }
+      ],
+      "checagens_especificas": [
+        "Prescrição: 3 anos para reparação civil em geral (CC art. 206, §3º, V); se enquadrado como relação de consumo, avaliar também o prazo do CDC. Confirmar a data do fato gerador com cuidado.",
+        "Distinguir responsabilidade subjetiva do médico (exige prova de culpa) da responsabilidade do hospital pela falha do serviço (pode ser objetiva quanto à sua própria atividade).",
+        "Perícia médica é praticamente sempre necessária — reforça a escolha do rito comum em vez do Juizado Especial.",
+        "Verificar se o prontuário médico completo foi obtido; paciente tem direito de acesso a ele.",
+        "Avaliar se cabe também representação ética perante o Conselho Regional de Medicina (CRM), em paralelo e sem prejuízo da ação cível."
+      ],
+      "estrategias_alternativas_sugeridas": ["A: ação indenizatória em vara cível comum com perícia médica", "B: notificação extrajudicial + tentativa de acordo com o hospital/seguradora antes de judicializar", "C: representação ética no CRM em paralelo à via cível"]
+    },
+
+    {
+      "template_id": "trabalhista_reclamacao",
+      "titulo": "Reclamação trabalhista – rito ordinário ou sumaríssimo",
+      "area": "trabalho",
+      "ramo": "trabalho",
+      "rito": "trabalhista",
+      "base_legal_tipica": ["CLT art. 840, §1º", "CLT arts. 477, 467, 468, 59, 71, 73", "CF art. 7º, XXIX (prescrição)", "Lei 13.467/2017"],
+      "competencia": "Local da prestação dos serviços (CLT art. 651). Sumaríssimo: até 40 SM, pedidos líquidos e indicação do endereço do reclamado.",
+      "campos_obrigatorios": ["reclamante", "reclamado", "data_admissao", "data_demissao", "funcao", "ultimo_salario", "jornada", "causa_extincao_contrato", "pedidos_liquidos"],
+      "documentos_tipicos": ["CTPS", "termo de rescisão", "contracheques", "extrato FGTS", "conversas/e-mails", "cartão de ponto (se houver)", "procuração e declaração de hipossuficiência"],
+      "secoes": [
+        { "id": "enderecamento", "texto": "{{bloco:enderecamento_trabalho}}" },
+        { "id": "partes", "texto": "{{bloco:qualificacao_pf}} (Reclamante), por {{advogado_ou_jus_postulandi}}, vem ajuizar\n\nRECLAMAÇÃO TRABALHISTA\n\nem face de {{bloco:qualificacao_pj}} (Reclamada), pelos motivos de fato e de direito a seguir." },
+        { "id": "contrato", "texto": "I – DO CONTRATO DE TRABALHO\nAdmissão em {{data_admissao}}, função de {{funcao}}, último salário de R$ {{salario}}, {{jornada}}. Extinção em {{data_saida}} por {{modalidade_extincao}}." },
+        { "id": "dos_fatos_direito", "texto": "II – DOS FATOS E DO DIREITO\n{{para_cada_pedido: fato + fundamento legal + base de cálculo}}" },
+        { "id": "gratuidade", "texto": "III – DA JUSTIÇA GRATUITA\n{{fundamentacao_gratuidade_CLT_790_par3_e_4}}" },
+        { "id": "pedidos", "texto": "IV – DOS PEDIDOS\nRequer a condenação da Reclamada ao pagamento de:\n{{lista_de_pedidos_com_valor_estimado_por_item}}\nAlém de: juros e correção monetária; honorários de sucumbência (CLT art. 791-A); {{?outros}}." },
+        { "id": "provas", "texto": "V – DAS PROVAS\nProtesta por todos os meios de prova em direito admitidos, inclusive depoimento pessoal, testemunhas e documentos." },
+        { "id": "valor_causa", "texto": "Dá-se à causa o valor de R$ {{soma_dos_pedidos}}." },
+        { "id": "fecho", "texto": "{{bloco:fecho}}" }
+      ],
+      "checagens_especificas": [
+        "Pedidos certos, determinados e com indicação de valor (CLT art. 840, §1º); valor da causa = soma dos pedidos.",
+        "Prescrição: bienal após a extinção do contrato e quinquenal retroativa (CF art. 7º, XXIX).",
+        "Reclamante sem advogado: pode formalizar por reclamação verbal na Vara/Distribuição (CLT art. 840, §2º).",
+        "Sumaríssimo exige pedidos líquidos e endereço correto da reclamada."
+      ],
+      "estrategias_alternativas_sugeridas": ["A: ação com todos os pedidos e valor completo", "B: proposta de acordo em CEJUSC-JT / conciliação prévia", "C: pedido enxuto (verbas rescisórias) em sumaríssimo"]
+    },
+
+    {
+      "template_id": "previdenciario_beneficio_jef",
+      "titulo": "Ação previdenciária (concessão/restabelecimento de benefício) – Juizado Especial Federal",
+      "area": "previdenciario",
+      "ramo": "federal",
+      "rito": "juizado_federal",
+      "base_legal_tipica": ["Lei 8.213/1991", "Lei 10.259/2001", "CF art. 201", "CPC art. 319"],
+      "competencia": "Justiça Federal; Juizado Federal até 60 SM (soma de parcelas vencidas e 12 vincendas). Foro do domicílio do autor.",
+      "campos_obrigatorios": ["autor", "beneficio_pretendido", "data_do_requerimento_administrativo", "numero_NB_ou_protocolo", "motivo_do_indeferimento", "periodos_contribuicao_ou_incapacidade", "valor_causa"],
+      "documentos_tipicos": ["documento pessoal", "comprovante de residência", "CNIS", "carta de indeferimento/comunicação de decisão do INSS", "CTPS e carnês", "laudos e atestados médicos (incapacidade)", "PPP/LTCAT (atividade especial)"],
+      "secoes": [
+        { "id": "enderecamento", "texto": "{{bloco:enderecamento_federal}}" },
+        { "id": "partes", "texto": "{{bloco:qualificacao_pf}}, vem propor\n\nAÇÃO DE {{tipo_beneficio}}\n\nem face do INSTITUTO NACIONAL DO SEGURO SOCIAL – INSS, autarquia federal, CNPJ 29.979.036/0001-40, com procuradoria em {{endereco_procuradoria}}." },
+        { "id": "interesse_agir", "texto": "I – DO INTERESSE DE AGIR\nO requerimento administrativo foi protocolado em {{data_DER}} (NB/protocolo {{numero}}) e {{indeferido_em_ou_sem_resposta_ha_dias}}, conforme Doc. {{doc}}." },
+        { "id": "dos_fatos", "texto": "II – DOS FATOS\n{{historico_contributivo_ou_incapacidade}}" },
+        { "id": "do_direito", "texto": "III – DO DIREITO\n{{fundamentacao_requisitos_do_beneficio}}\nDo termo inicial (DIB): {{fundamentacao_DIB}}." },
+        { "id": "tutela", "texto": "IV – DA TUTELA DE URGÊNCIA\n{{?tutela_natureza_alimentar}}" },
+        { "id": "pedidos", "texto": "V – DOS PEDIDOS\na) a citação do INSS;\nb) {{?perícia_médica_ou_judicial}};\nc) a concessão/restabelecimento do benefício {{beneficio}} desde {{DIB}};\nd) pagamento das parcelas vencidas e vincendas, com correção monetária e juros conforme o Manual de Cálculos da Justiça Federal vigente;\ne) a gratuidade da justiça." },
+        { "id": "provas", "texto": "VI – DAS PROVAS\nDocumental, pericial ({{tipo_pericia}}), testemunhal e depoimento pessoal." },
+        { "id": "valor_causa", "texto": "Valor da causa: R$ {{vencidas_mais_12_vincendas}}, correspondente às parcelas vencidas mais 12 vincendas." },
+        { "id": "fecho", "texto": "{{bloco:fecho}}" }
+      ],
+      "checagens_especificas": [
+        "Requerimento administrativo prévio (ou prazo de análise vencido) comprovado.",
+        "Soma de vencidas + 12 vincendas ≤ 60 SM; senão, renúncia ao excedente ou vara federal comum.",
+        "Prescrição quinquenal sobre parcelas vencidas.",
+        "Incapacidade: laudos e exames recentes anexados."
+      ],
+      "estrategias_alternativas_sugeridas": ["A: JEF com perícia e tutela", "B: recurso administrativo à Junta de Recursos (CRPS)", "C: vara federal comum (valor acima do teto)"]
+    },
+
+    {
+      "template_id": "familia_alimentos",
+      "titulo": "Ação de alimentos",
+      "area": "familia",
+      "ramo": "estadual",
+      "rito": "especial_lei_5478",
+      "base_legal_tipica": ["CC arts. 1.694 a 1.710", "Lei 5.478/1968", "CPC arts. 528 e ss.", "ECA"],
+      "competencia": "Foro do domicílio ou residência do alimentando (CPC art. 53, II). Vara de Família da comarca.",
+      "campos_obrigatorios": ["alimentando", "representante_legal_se_menor", "alimentante", "necessidades", "possibilidades_do_alimentante", "valor_ou_percentual_pedido"],
+      "documentos_tipicos": ["certidão de nascimento/casamento", "comprovantes de despesas (escola, saúde, moradia)", "provas de renda ou sinais exteriores de riqueza do alimentante", "documentos pessoais"],
+      "secoes": [
+        { "id": "enderecamento", "texto": "{{bloco:enderecamento_estadual}} (Vara de Família)" },
+        { "id": "partes", "texto": "{{qualificacao_alimentando}}, {{?representado_por}}, vem propor\n\nAÇÃO DE ALIMENTOS {{?com_pedido_de_alimentos_provisórios}}\n\nem face de {{qualificacao_alimentante}}." },
+        { "id": "dos_fatos", "texto": "I – DOS FATOS\n{{relacao_de_parentesco}} {{situacao_atual_de_guarda_e_convivencia}} {{necessidades}}" },
+        { "id": "do_direito", "texto": "II – DO DIREITO\nBinômio necessidade-possibilidade (CC art. 1.694, §1º): {{fundamentacao}}." },
+        { "id": "tutela", "texto": "III – DOS ALIMENTOS PROVISÓRIOS\nRequer a fixação liminar de alimentos provisórios em {{valor_ou_percentual}}, diante da prova pré-constituída do parentesco (Lei 5.478/68, art. 4º)." },
+        { "id": "pedidos", "texto": "IV – DOS PEDIDOS\na) a fixação de alimentos provisórios;\nb) a citação do réu;\nc) a fixação definitiva de alimentos em {{valor_ou_percentual}}, {{desconto_em_folha_ou_deposito}};\nd) intimação do Ministério Público;\ne) gratuidade da justiça." },
+        { "id": "audiencia", "texto": "V – DA AUDIÊNCIA\nRequer a designação de audiência de conciliação e mediação." },
+        { "id": "valor_causa", "texto": "Valor da causa: R$ {{doze_vezes_a_prestacao_pedida}} (CPC art. 292, III)." },
+        { "id": "fecho", "texto": "{{bloco:fecho}}" }
+      ],
+      "checagens_especificas": [
+        "Representação legal do menor corretamente identificada.",
+        "Valor da causa = 12 prestações pedidas.",
+        "Intimação do Ministério Público requerida quando houver incapaz.",
+        "Defensoria Pública pode atuar sem procuração formal em casos de hipossuficiência."
+      ],
+      "estrategias_alternativas_sugeridas": ["A: ação judicial com alimentos provisórios", "B: acordo extrajudicial homologado (Defensoria/CEJUSC ou escritura em cartório)", "C: alimentos em percentual sobre rendimentos vs. valor fixo"]
+    }
+  ],
+
+  "pecas_acessorias": [
+    {
+      "template_id": "procuracao_ad_judicia",
+      "titulo": "Procuração Ad Judicia",
+      "campos_obrigatorios": ["outorgante", "outorgado_advogado", "poderes", "foro"],
+      "texto": "PROCURAÇÃO AD JUDICIA\nOUTORGANTE: {{bloco:qualificacao_pf}}.\nOUTORGADO(A): {{nome_advogado}}, OAB/{{uf}} nº {{numero}}, com escritório na {{endereco_escritorio}}.\nPODERES: os da cláusula ad judicia et extra, para o foro em geral, {{?poderes_especiais: receber e dar quitação, transigir, desistir, firmar compromisso, requerer gratuidade}}, a fim de {{finalidade}}.\n{{cidade}}/AM, {{data}}.\n\n{{assinatura_outorgante}}"
+    },
+    {
+      "template_id": "declaracao_hipossuficiencia",
+      "titulo": "Declaração de Hipossuficiência",
+      "campos_obrigatorios": ["declarante", "cpf"],
+      "texto": "DECLARAÇÃO DE HIPOSSUFICIÊNCIA\nEu, {{nome}}, CPF {{cpf}}, declaro, para os fins do art. 98 do CPC e da Lei 1.060/50, que não tenho condições de arcar com custas, despesas processuais e honorários sem prejuízo do meu sustento e de minha família. Declaro estar ciente de que a falsidade desta declaração pode acarretar sanções legais.\n{{cidade}}/AM, {{data}}.\n{{assinatura}}"
+    },
+    {
+      "template_id": "notificacao_extrajudicial",
+      "titulo": "Notificação Extrajudicial",
+      "campos_obrigatorios": ["notificante", "notificado", "fatos", "providencia_exigida", "prazo_dias"],
+      "texto": "NOTIFICAÇÃO EXTRAJUDICIAL\nNOTIFICANTE: {{qualificacao_notificante}}.\nNOTIFICADO: {{qualificacao_notificado}}.\nPelo presente, NOTIFICA-SE V.Sa. de que {{resumo_fatos}}. Assim, fica V.Sa. constituído(a) em mora e NOTIFICADO(A) a {{providencia_exigida}} no prazo de {{prazo_dias}} ({{extenso}}) dias, contados do recebimento, sob pena de adoção das medidas judiciais cabíveis, com cobrança de custas, honorários e demais consectários legais.\nA presente é enviada por {{meio: carta com AR / cartório de títulos e documentos / e-mail com comprovação}}.\n{{cidade}}/AM, {{data}}.\n{{assinatura}}"
+    },
+    {
+      "template_id": "rol_documentos",
+      "titulo": "Rol de Documentos",
+      "campos_obrigatorios": ["documentos"],
+      "texto": "ROL DE DOCUMENTOS\n{{para_cada_documento: 'Doc. NN – descrição – data – finalidade probatória'}}"
+    }
+  ]
+}

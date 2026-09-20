@@ -77,10 +77,17 @@ class TriageService:
         sessao.resumo_atual = llm_engine.extrair_resumo_estruturado(sessao.historico)
 
     def _deve_encaminhar(self, sessao: SessaoConversa) -> bool:
-        return (
-            sessao.resumo_atual.pronto_para_advogado
-            or sessao.resumo_atual.urgencia == Urgencia.CRITICA
-        )
+        resumo = sessao.resumo_atual
+
+        # Urgência crítica sempre encaminha na hora, mesmo com qualificação
+        # incompleta — não faz sentido segurar um caso de risco esperando CEP.
+        if resumo.urgencia == Urgencia.CRITICA:
+            return True
+
+        # Trava determinística: não confiamos só na IA dizer que "está
+        # pronto" — exigimos de verdade que os 10 dados de qualificação
+        # estejam preenchidos antes de liberar o encaminhamento.
+        return resumo.pronto_para_advogado and resumo.dados_pessoais_autor.esta_completo()
 
     async def _encerrar_com_handoff(self, sessao: SessaoConversa) -> None:
         await handoff_service.encaminhar(sessao)

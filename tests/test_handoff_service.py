@@ -6,6 +6,7 @@ import pytest
 from src.domain.schemas import (
     AreaDireito,
     DadosContato,
+    DadosPessoaisAutor,
     ResumoTriagem,
     SessaoConversa,
     Urgencia,
@@ -24,6 +25,18 @@ def _criar_sessao_com_resumo() -> SessaoConversa:
             urgencia=Urgencia.MEDIA,
             fatos_relevantes=["Carteira assinada", "Trabalhou 2 anos"],
             pronto_para_advogado=True,
+            dados_pessoais_autor=DadosPessoaisAutor(
+                nome="Cliente Teste",
+                nacionalidade="brasileira",
+                estado_civil="solteiro",
+                profissao="motorista",
+                cpf="123.456.789-00",
+                rg="1234567",
+                endereco_completo="Rua X, 123",
+                cep="69000-000",
+                cidade="Manaus",
+                data_nascimento="1990-01-01",
+            ),
         ),
     )
 
@@ -87,3 +100,28 @@ async def test_falha_no_whatsapp_nao_impede_gravacao_do_log(monkeypatch, tmp_pat
     with open(log_path, encoding="utf-8") as f:
         linha = json.loads(f.readline())
     assert linha["telefone"] == "5592984705217"
+
+
+def test_mensagem_inclui_a_qualificacao_completa():
+    service = HandoffService()
+    sessao = _criar_sessao_com_resumo()
+
+    texto = service._montar_texto(sessao)
+
+    assert "Cliente Teste" in texto
+    assert "123.456.789-00" in texto
+    assert "Rua X, 123" in texto
+    assert "⚠️ Qualificação incompleta" not in texto
+
+
+def test_mensagem_alerta_quando_qualificacao_esta_incompleta():
+    from src.domain.schemas import DadosPessoaisAutor
+
+    service = HandoffService()
+    sessao = _criar_sessao_com_resumo()
+    sessao.resumo_atual.dados_pessoais_autor = DadosPessoaisAutor(nome="Cliente Teste")  # só o nome
+
+    texto = service._montar_texto(sessao)
+
+    assert "⚠️ Qualificação incompleta" in texto
+    assert "CPF" in texto

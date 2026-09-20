@@ -45,3 +45,8 @@ class ResultadoVerificacaoCitacao(BaseModel):
 
 class RespostaVerificacaoCitacoes(BaseModel):
     resultados: List[ResultadoVerificacaoCitacao] = Field(default_factory=list)
+
+
+class CitacoesExtraidas(BaseModel):
+    """Saída do LLM ao extrair candidatos de citação de resultados de busca."""
+    citacoes: List[CitacaoEntrada] = Field(default_factory=list)

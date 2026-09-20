@@ -8,14 +8,22 @@ petição — só compara estratégias.
 """
 import json
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from openai import OpenAI
 from pydantic import ValidationError
 
 from ..core.config import settings
+from ..domain.citacao_schemas import CitacaoEntrada, StatusVerificacao
+from ..domain.competencia_schemas import RespostaCompetencia
 from ..domain.estrategia_schemas import RespostaEstrategias
+from ..domain.pressupostos_schemas import CheckPressupostosRequest, RespostaPressupostos
 from ..domain.schemas import SessaoConversa
+from ..repositories.session_repository import sessao_repository
+from .jurisprudencia_service import jurisprudencia_service
+from .legislacao_service import legislacao_service
+from .pressupostos_service import checar_pressupostos_service
+from .verificacao_citacao_service import verificacao_citacao_service
 
 logger = logging.getLogger(__name__)
 
@@ -100,54 +108,164 @@ Responda SOMENTE com um JSON válido neste formato, sem texto fora dele:
 - O JSON é válido e não há texto fora dele?
 """
 
+# Nota adicional (fora do prompt original): quando a entrada trouxer o campo
+# "citacoes_verificadas_mas_nao_confirmadas", essas referências passaram por
+# checagem e NÃO puderam ser confirmadas — a regra 3 acima já proíbe citá-las
+# como fundamento; se forem relevantes, use "fundamento a verificar: <descrição>".
+_NOTA_CITACOES_NAO_CONFIRMADAS = (
+    "Nota adicional: se a entrada trouxer 'citacoes_verificadas_mas_nao_confirmadas', "
+    "essas referências passaram por verificação e NÃO puderam ser confirmadas. "
+    "Você não pode citá-las como fundamento — se forem relevantes, use "
+    "'fundamento a verificar: <descrição>', conforme a regra 3."
+)
+
+
+def _construir_fatos_dict(sessao: SessaoConversa) -> dict:
+    """
+    Prefere os fatos estruturados de extrair_fatos (linha do tempo, partes,
+    valores, pontos controvertidos) quando já foram extraídos para essa
+    sessão — são bem mais ricos que o resumo raso da triagem. Se ainda não
+    foram extraídos, cai de volta no resumo_atual (comportamento anterior).
+    """
+    r = sessao.resumo_atual
+    if sessao.fatos_estruturados:
+        fe = sessao.fatos_estruturados
+        return {
+            "resumo": fe.resumo_narrativo,
+            "linha_do_tempo": [e.model_dump() for e in fe.linha_do_tempo],
+            "partes": [p.model_dump() for p in fe.partes],
+            "valores_mencionados": [v.model_dump() for v in fe.valores_mencionados],
+            "pontos_controvertidos": [p.model_dump() for p in fe.pontos_controvertidos],
+            "lacunas_dos_fatos": [l.model_dump() for l in fe.lacunas],
+            "documentos_mencionados": r.documentos_mencionados,
+        }
+    return {
+        "resumo": r.resumo_caso,
+        "fatos_relevantes": r.fatos_relevantes,
+        "documentos_mencionados": r.documentos_mencionados,
+        "perguntas_em_aberto": r.perguntas_em_aberto,
+    }
+
 
 def _montar_entrada(
     sessao: SessaoConversa,
     objetivo_usuario: Optional[str],
     num_estrategias: int,
+    citacoes_confirmadas: list,
+    citacoes_rejeitadas: list,
+    competencia: Optional[RespostaCompetencia],
+    pressupostos: Optional[RespostaPressupostos],
 ) -> dict:
     """
     Monta o objeto de entrada a partir do que já temos da triagem. Campos
-    que dependeriam de tools ainda não implementadas (classificar_caso,
-    definir_competencia, checar_pressupostos, buscar_jurisprudencia +
-    verificar_citacao, consultar_datajud) entram como null — o próprio
-    prompt trata isso via a seção "lacunas", sem o modelo inventar dado.
+    que dependeriam de tools ainda não implementadas (consultar_datajud)
+    entram como null — o próprio prompt trata isso via a seção "lacunas",
+    sem o modelo inventar dado.
+
+    `pesquisa_verificada` só recebe citações que passaram por
+    verificar_citacao com status CONFIRMADA — nunca citações não checadas.
     """
     r = sessao.resumo_atual
-    return {
-        "fatos": {
-            "resumo": r.resumo_caso,
-            "fatos_relevantes": r.fatos_relevantes,
-            "documentos_mencionados": r.documentos_mencionados,
-            "perguntas_em_aberto": r.perguntas_em_aberto,
-        },
+    entrada = {
+        "fatos": _construir_fatos_dict(sessao),
         "classificacao": {
             "area_direito": r.area_direito.value,
             "subtema": r.subtema,
         },
-        "competencia": None,  # ainda não implementamos definir_competencia
-        "pressupostos": None,  # ainda não implementamos checar_pressupostos
+        "competencia": competencia.model_dump() if competencia else None,
+        "pressupostos": pressupostos.model_dump() if pressupostos else None,
         "valor_causa": None,
-        "pesquisa_verificada": [],  # ainda não implementamos verificar_citacao
+        "pesquisa_verificada": citacoes_confirmadas,
         "estatisticas_datajud": None,
         "objetivo_usuario": objetivo_usuario,
         "num_estrategias": num_estrategias,
     }
+    if citacoes_rejeitadas:
+        entrada["citacoes_verificadas_mas_nao_confirmadas"] = citacoes_rejeitadas
+    return entrada
 
 
 class EstrategiaService:
     def __init__(self) -> None:
         self._client = OpenAI(api_key=settings.LLM_API_KEY, base_url=settings.LLM_BASE_URL)
 
-    def gerar(
+    async def gerar(
         self,
         sessao: SessaoConversa,
         objetivo_usuario: Optional[str] = None,
         num_estrategias: int = 3,
+        citacoes_candidatas: Optional[List[CitacaoEntrada]] = None,
+        buscar_jurisprudencia_automaticamente: bool = False,
+        buscar_legislacao_automaticamente: bool = False,
+        competencia: Optional[RespostaCompetencia] = None,
+        pressupostos: Optional[RespostaPressupostos] = None,
+        checar_pressupostos_automaticamente: bool = False,
     ) -> RespostaEstrategias:
-        entrada = _montar_entrada(sessao, objetivo_usuario, num_estrategias)
+        if not citacoes_candidatas and (
+            buscar_jurisprudencia_automaticamente or buscar_legislacao_automaticamente
+        ):
+            consulta = sessao.resumo_atual.resumo_caso or sessao.resumo_atual.area_direito.value
+            citacoes_candidatas = []
+            if buscar_jurisprudencia_automaticamente:
+                try:
+                    citacoes_candidatas += await jurisprudencia_service.buscar(consulta)
+                except Exception:
+                    logger.exception(
+                        "Falha na busca automática de jurisprudência para o caso %s", sessao.telefone
+                    )
+            if buscar_legislacao_automaticamente:
+                try:
+                    citacoes_candidatas += await legislacao_service.buscar(consulta)
+                except Exception:
+                    logger.exception(
+                        "Falha na busca automática de legislação para o caso %s", sessao.telefone
+                    )
+
+        if checar_pressupostos_automaticamente and pressupostos is None:
+            try:
+                pressupostos = checar_pressupostos_service.checar(
+                    CheckPressupostosRequest(
+                        area=sessao.resumo_atual.area_direito.value,
+                        fatos=_construir_fatos_dict(sessao),
+                    )
+                )
+            except Exception:
+                logger.exception("Falha na checagem automática de pressupostos para o caso %s", sessao.telefone)
+                pressupostos = None
+
+        citacoes_confirmadas: list = []
+        citacoes_rejeitadas: list = []
+
+        if citacoes_candidatas:
+            resultados = await verificacao_citacao_service.verificar(citacoes_candidatas)
+            for res in resultados:
+                item = {
+                    "tipo": res.tipo.value,
+                    "referencia": res.referencia,
+                    "fonte_url": res.fonte_url,
+                    "trecho_confere": res.trecho_confere,
+                    "observacao": res.observacao,
+                }
+                if res.status == StatusVerificacao.CONFIRMADA:
+                    citacoes_confirmadas.append(item)
+                else:
+                    citacoes_rejeitadas.append({**item, "status": res.status.value})
+
+        entrada = _montar_entrada(
+            sessao,
+            objetivo_usuario,
+            num_estrategias,
+            citacoes_confirmadas,
+            citacoes_rejeitadas,
+            competencia,
+            pressupostos,
+        )
+        system_prompt = SYSTEM_PROMPT_ESTRATEGIAS
+        if citacoes_rejeitadas:
+            system_prompt = f"{SYSTEM_PROMPT_ESTRATEGIAS}\n\n{_NOTA_CITACOES_NAO_CONFIRMADAS}"
+
         mensagens = [
-            {"role": "system", "content": SYSTEM_PROMPT_ESTRATEGIAS},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": json.dumps(entrada, ensure_ascii=False)},
         ]
 
@@ -162,7 +280,13 @@ class EstrategiaService:
             texto = resp.choices[0].message.content or ""
             try:
                 dados = json.loads(texto)
-                return RespostaEstrategias(**dados)
+                resultado = RespostaEstrategias(**dados)
+                # Persiste pra permitir que o advogado "escolha" uma delas
+                # depois (ver EstrategiaService.escolher) — sem isso, o
+                # endpoint de escolha não teria como saber quais IDs existem.
+                sessao.ultimas_estrategias = resultado
+                sessao_repository.salvar(sessao)
+                return resultado
             except (json.JSONDecodeError, ValidationError) as e:
                 ultimo_erro = e
                 logger.warning("Saída inválida de gerar_estrategias (tentativa %s): %s", tentativa + 1, e)
@@ -181,6 +305,29 @@ class EstrategiaService:
             f"Não foi possível obter uma resposta válida de gerar_estrategias após "
             f"{_MAX_TENTATIVAS} tentativas: {ultimo_erro}"
         )
+
+    def escolher(self, sessao: SessaoConversa, estrategia_id: str):
+        """
+        O advogado escolhe uma das estratégias já geradas para o caso. A
+        escolha fica salva na sessão e passa a guiar o restante do
+        processo — em especial, gerar_peticao usa isso automaticamente
+        quando chamado com o telefone deste caso.
+        """
+        if sessao.ultimas_estrategias is None:
+            raise ValueError("Nenhuma estratégia foi gerada ainda para este caso.")
+
+        escolhida = next(
+            (e for e in sessao.ultimas_estrategias.estrategias if e.id == estrategia_id), None
+        )
+        if escolhida is None:
+            ids_disponiveis = [e.id for e in sessao.ultimas_estrategias.estrategias]
+            raise ValueError(
+                f"Estratégia '{estrategia_id}' não encontrada. IDs disponíveis: {ids_disponiveis}"
+            )
+
+        sessao.estrategia_escolhida = escolhida
+        sessao_repository.salvar(sessao)
+        return escolhida
 
 
 # instância padrão usada pela aplicação

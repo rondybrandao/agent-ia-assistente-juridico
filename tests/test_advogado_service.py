@@ -179,7 +179,7 @@ async def test_comando_estrategias_gera_e_formata_a_resposta(repo_com_caso, monk
         ],
         aviso="A decisão final é do advogado responsável.",
     )
-    mock_gerar = MagicMock(return_value=resposta_falsa)
+    mock_gerar = AsyncMock(return_value=resposta_falsa)
     monkeypatch.setattr(advogado_service_module.estrategia_service, "gerar", mock_gerar)
 
     service = AdvogadoService()
@@ -189,3 +189,42 @@ async def test_comando_estrategias_gera_e_formata_a_resposta(repo_com_caso, monk
     texto_enviado = mock_whatsapp.call_args[0][1]
     assert "Juizado Especial" in texto_enviado
     assert "responsável" in texto_enviado
+
+
+@pytest.mark.asyncio
+async def test_comando_fatos_extrai_e_formata_a_resposta(repo_com_caso, monkeypatch):
+    mock_whatsapp = AsyncMock()
+    monkeypatch.setattr(advogado_service_module.whatsapp_client, "enviar_mensagem_texto", mock_whatsapp)
+
+    from src.domain.fatos_schemas import EventoLinhaDoTempo, RespostaExtracaoFatos
+
+    resultado_falso = RespostaExtracaoFatos(
+        resumo_narrativo="Cliente relata cobrança indevida.",
+        linha_do_tempo=[
+            EventoLinhaDoTempo(
+                data=None, data_aproximada_texto="março de 2024", descricao="Cobrança percebida", fonte="relato"
+            )
+        ],
+    )
+    mock_extrair = MagicMock(return_value=resultado_falso)
+    monkeypatch.setattr(advogado_service_module.extracao_fatos_service, "extrair_e_persistir", mock_extrair)
+
+    service = AdvogadoService()
+    await service.processar_comando("5511888887777", "fatos 5592984705217")
+
+    mock_extrair.assert_called_once()
+    texto_enviado = mock_whatsapp.call_args[0][1]
+    assert "Cobrança percebida" in texto_enviado
+    assert "estrategias" in texto_enviado.lower()
+
+
+@pytest.mark.asyncio
+async def test_comando_fatos_com_telefone_inexistente(repo_com_caso, monkeypatch):
+    mock_whatsapp = AsyncMock()
+    monkeypatch.setattr(advogado_service_module.whatsapp_client, "enviar_mensagem_texto", mock_whatsapp)
+
+    service = AdvogadoService()
+    await service.processar_comando("5511888887777", "fatos 0000000000")
+
+    texto_enviado = mock_whatsapp.call_args[0][1]
+    assert "Nenhum caso encontrado" in texto_enviado
