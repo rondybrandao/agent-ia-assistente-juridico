@@ -55,6 +55,23 @@ class PecaRepository:
             return None
         return Peca.model_validate_json(row[0])
 
+    def buscar_mais_recente_por_telefone(self, telefone: str) -> Optional[Peca]:
+        """
+        Usada pelo chat de pesquisa para responder perguntas sobre "a
+        petição em construção" deste caso — sem índice dedicado por
+        telefone (a tabela guarda só o JSON), então filtra em memória. Para
+        o volume esperado de peças por escritório, isso é suficiente.
+        """
+        with self._conn() as conn:
+            rows = conn.execute("SELECT dados_json FROM pecas").fetchall()
+        pecas_do_caso = [
+            Peca.model_validate_json(row[0]) for row in rows
+        ]
+        pecas_do_caso = [p for p in pecas_do_caso if p.telefone == telefone]
+        if not pecas_do_caso:
+            return None
+        return max(pecas_do_caso, key=lambda p: p.criada_em)
+
 
 # instância padrão usada pela aplicação
 peca_repository = PecaRepository()

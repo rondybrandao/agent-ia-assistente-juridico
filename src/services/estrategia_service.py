@@ -120,33 +120,6 @@ _NOTA_CITACOES_NAO_CONFIRMADAS = (
 )
 
 
-def _construir_fatos_dict(sessao: SessaoConversa) -> dict:
-    """
-    Prefere os fatos estruturados de extrair_fatos (linha do tempo, partes,
-    valores, pontos controvertidos) quando já foram extraídos para essa
-    sessão — são bem mais ricos que o resumo raso da triagem. Se ainda não
-    foram extraídos, cai de volta no resumo_atual (comportamento anterior).
-    """
-    r = sessao.resumo_atual
-    if sessao.fatos_estruturados:
-        fe = sessao.fatos_estruturados
-        return {
-            "resumo": fe.resumo_narrativo,
-            "linha_do_tempo": [e.model_dump() for e in fe.linha_do_tempo],
-            "partes": [p.model_dump() for p in fe.partes],
-            "valores_mencionados": [v.model_dump() for v in fe.valores_mencionados],
-            "pontos_controvertidos": [p.model_dump() for p in fe.pontos_controvertidos],
-            "lacunas_dos_fatos": [l.model_dump() for l in fe.lacunas],
-            "documentos_mencionados": r.documentos_mencionados,
-        }
-    return {
-        "resumo": r.resumo_caso,
-        "fatos_relevantes": r.fatos_relevantes,
-        "documentos_mencionados": r.documentos_mencionados,
-        "perguntas_em_aberto": r.perguntas_em_aberto,
-    }
-
-
 def _montar_entrada(
     sessao: SessaoConversa,
     objetivo_usuario: Optional[str],
@@ -167,7 +140,7 @@ def _montar_entrada(
     """
     r = sessao.resumo_atual
     entrada = {
-        "fatos": _construir_fatos_dict(sessao),
+        "fatos": sessao.construir_fatos_dict(),
         "classificacao": {
             "area_direito": r.area_direito.value,
             "subtema": r.subtema,
@@ -226,7 +199,7 @@ class EstrategiaService:
                 pressupostos = checar_pressupostos_service.checar(
                     CheckPressupostosRequest(
                         area=sessao.resumo_atual.area_direito.value,
-                        fatos=_construir_fatos_dict(sessao),
+                        fatos=sessao.construir_fatos_dict(),
                     )
                 )
             except Exception:

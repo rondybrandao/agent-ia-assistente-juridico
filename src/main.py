@@ -13,6 +13,7 @@ from .api.classificacao_routes import router as classificacao_router
 from .api.competencia_routes import router as competencia_router
 from .api.custas_routes import router as custas_router
 from .api.fatos_routes import router as fatos_router
+from .api.novo_caso_routes import router as novo_caso_router
 from .api.peticoes_routes import router as peticoes_router
 from .api.prazos_routes import router as prazos_router
 from .api.pressupostos_routes import router as pressupostos_router
@@ -45,6 +46,7 @@ def criar_app() -> FastAPI:
     app.include_router(fatos_router)
     app.include_router(valor_causa_router)
     app.include_router(custas_router)
+    app.include_router(novo_caso_router)
     return app
 
 

@@ -20,6 +20,7 @@ from pydantic import ValidationError
 
 from ..core.config import settings
 from ..domain.peticao_schemas import Peca, PeticaoRequest, PeticaoResponse
+from ..domain.schemas import SessaoConversa
 from ..repositories.peca_repository import peca_repository
 from ..repositories.session_repository import sessao_repository
 
@@ -67,6 +68,11 @@ legal:
   - Use "estrategia_escolhida" (quando presente) como guia: os
     "fundamentos" dela são uma ótima fonte para essas seções; os
     "pedidos_principais" dela guiam a seção de pedidos.
+  - Use "prazo_calculado" (quando presente) só como contexto de urgência —
+    por exemplo, para justificar um pedido de tutela de urgência citando
+    quantos dias úteis restam até um vencimento já calculado. NUNCA cite
+    um prazo, data ou contagem de dias que não esteja em "prazo_calculado"
+    — se precisar mencionar prazo e ele não estiver disponível, não invente.
 
 Regras invioláveis (valem para os dois tipos):
 1. Preserve a estrutura, a ordem das seções e a linguagem jurídica formal
@@ -142,6 +148,23 @@ def _montar_esqueleto(template: Dict[str, Any], blocos: Dict[str, str]) -> str:
     return "\n\n".join(partes_texto)
 
 
+def _mesclar_dados_pessoais_autor(partes: Dict[str, Any], sessao: SessaoConversa) -> Dict[str, Any]:
+    """
+    Se o caso já tem qualificação coletada (pela triagem do WhatsApp, pelo
+    chat de novo caso, ou por extrair_fatos), usa ela para completar
+    'partes' automaticamente. Sem isso, dados que o cliente já informou —
+    nome, CPF, RG, endereço — ficavam presos no resumo da triagem e nunca
+    chegavam na petição, mesmo já tendo sido coletados, fazendo a IA
+    marcar tudo como [PENDENTE] à toa.
+
+    Valores já informados manualmente pelo chamador em `partes` sempre têm
+    prioridade sobre os da sessão.
+    """
+    dp = sessao.resumo_atual.dados_pessoais_autor
+    dados_autor = {campo: valor for campo, valor in dp.model_dump().items() if valor}
+    return {**dados_autor, **partes}
+
+
 class PeticaoService:
     def __init__(self) -> None:
         self._client = OpenAI(api_key=settings.LLM_API_KEY, base_url=settings.LLM_BASE_URL)
@@ -160,15 +183,24 @@ class PeticaoService:
         ]
 
     async def gerar(self, entrada: PeticaoRequest) -> PeticaoResponse:
+        sessao = sessao_repository.carregar(entrada.telefone) if entrada.telefone else None
+
+        estrategia_escolhida = entrada.estrategia_escolhida
+        if sessao and not estrategia_escolhida and sessao.estrategia_escolhida:
+            estrategia_escolhida = sessao.estrategia_escolhida.model_dump()
+
+        if sessao:
+            entrada.partes = _mesclar_dados_pessoais_autor(entrada.partes, sessao)
+            if not entrada.fatos:
+                entrada.fatos = sessao.construir_fatos_dict()
+            if not entrada.competencia and sessao.competencia_definida:
+                entrada.competencia = sessao.competencia_definida.model_dump()
+            if entrada.valor_causa is None and sessao.ultimo_calculo_valor_causa:
+                entrada.valor_causa = sessao.ultimo_calculo_valor_causa.valor_da_causa
+
         template = self.buscar_template(entrada.template_id)
         blocos_resolvidos = _resolver_blocos_condicionais(_TEMPLATES_DATA["blocos_reutilizaveis"], entrada)
         esqueleto = _montar_esqueleto(template, blocos_resolvidos)
-
-        estrategia_escolhida = entrada.estrategia_escolhida
-        if entrada.telefone and not estrategia_escolhida:
-            sessao = sessao_repository.carregar(entrada.telefone)
-            if sessao and sessao.estrategia_escolhida:
-                estrategia_escolhida = sessao.estrategia_escolhida.model_dump()
 
         dados_preenchimento = {
             "fatos": entrada.fatos,
@@ -178,6 +210,11 @@ class PeticaoService:
             "estrategia_escolhida": estrategia_escolhida,
             "citacoes_verificadas": [c.model_dump() for c in entrada.citacoes_verificadas],
             "pedidos_adicionais": entrada.pedidos_adicionais,
+            "prazo_calculado": (
+                sessao.ultimo_prazo_calculado.model_dump(mode="json")
+                if sessao and sessao.ultimo_prazo_calculado
+                else None
+            ),
         }
 
         mensagens = [
@@ -205,6 +242,7 @@ class PeticaoService:
                 dados = json.loads(texto)
                 peca = Peca(
                     peca_id=str(uuid.uuid4()),
+                    telefone=entrada.telefone,
                     template_id=entrada.template_id,
                     titulo=template["titulo"],
                     peca_texto=dados["peca_texto"],

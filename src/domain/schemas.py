@@ -14,9 +14,11 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from .estrategia_schemas import Estrategia
+from .competencia_schemas import RespostaCompetencia
 from .estrategia_schemas import Estrategia, RespostaEstrategias
 from .fatos_schemas import RespostaExtracaoFatos
+from .prazo_schemas import RespostaPrazo
+from .valor_causa_schemas import RespostaValorCausa
 
 
 class Urgencia(str, Enum):
@@ -150,6 +152,36 @@ class SessaoConversa(BaseModel):
     fatos_estruturados: Optional[RespostaExtracaoFatos] = None
     ultimas_estrategias: Optional[RespostaEstrategias] = None
     estrategia_escolhida: Optional[Estrategia] = None
-    estrategia_escolhida: Optional[Estrategia] = None
+    competencia_definida: Optional[RespostaCompetencia] = None
+    ultimo_calculo_valor_causa: Optional[RespostaValorCausa] = None
+    ultimo_prazo_calculado: Optional[RespostaPrazo] = None
     criada_em: datetime = Field(default_factory=datetime.utcnow)
     atualizada_em: datetime = Field(default_factory=datetime.utcnow)
+
+    def construir_fatos_dict(self) -> dict:
+        """
+        Monta o dict de 'fatos' usado por gerar_estrategias, gerar_peticao
+        e checar_pressupostos. Prefere os fatos estruturados de
+        extrair_fatos (linha do tempo, partes, valores, pontos
+        controvertidos) quando já foram extraídos para esta sessão — são
+        bem mais ricos que o resumo raso da triagem. Se ainda não foram
+        extraídos, cai de volta no resumo_atual.
+        """
+        r = self.resumo_atual
+        if self.fatos_estruturados:
+            fe = self.fatos_estruturados
+            return {
+                "resumo": fe.resumo_narrativo,
+                "linha_do_tempo": [e.model_dump() for e in fe.linha_do_tempo],
+                "partes": [p.model_dump() for p in fe.partes],
+                "valores_mencionados": [v.model_dump() for v in fe.valores_mencionados],
+                "pontos_controvertidos": [p.model_dump() for p in fe.pontos_controvertidos],
+                "lacunas_dos_fatos": [l.model_dump() for l in fe.lacunas],
+                "documentos_mencionados": r.documentos_mencionados,
+            }
+        return {
+            "resumo": r.resumo_caso,
+            "fatos_relevantes": r.fatos_relevantes,
+            "documentos_mencionados": r.documentos_mencionados,
+            "perguntas_em_aberto": r.perguntas_em_aberto,
+        }

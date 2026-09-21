@@ -10,7 +10,7 @@ estrutura rígida aqui atrapalharia mais do que ajudaria — a validação de
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CitacaoParaPeca(BaseModel):
@@ -29,15 +29,27 @@ class PeticaoRequest(BaseModel):
     fatos: Dict[str, Any] = Field(default_factory=dict)
     partes: Dict[str, Any] = Field(default_factory=dict)
     competencia: Dict[str, Any] = Field(default_factory=dict)
-    valor_causa: float
+    valor_causa: Optional[float] = None  # se omitido e telefone informado, usa o último calcular_valor_causa do caso
     citacoes_verificadas: List[CitacaoParaPeca] = Field(default_factory=list)
     pedidos_adicionais: List[str] = Field(default_factory=list)
+
+    @field_validator("valor_causa", mode="before")
+    @classmethod
+    def _string_vazia_vira_none(cls, v: Any) -> Any:
+        """Alguns clientes HTTP (ex.: <input type="number"> do Angular
+        quando o campo fica vazio) mandam "" em vez de omitir o campo ou
+        mandar null. Sem isso, "" quebra a conversão para float com 422,
+        mesmo o campo sendo opcional."""
+        if v == "":
+            return None
+        return v
 
 
 class Peca(BaseModel):
     """Uma peça gerada e persistida — o que revisar_peticao e
     exportar_documento consultam a partir do peca_id."""
     peca_id: str
+    telefone: Optional[str] = None  # liga a peça ao caso, para o chat de pesquisa consultar
     template_id: str
     titulo: str
     peca_texto: str
